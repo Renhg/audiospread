@@ -1,0 +1,109 @@
+
+#!/usr/bin/env bash
+set -euo pipefail
+
+MODULE_NAME="module-combine-sink"
+VIRTUAL_SINK="audiospread_sink"
+VIRTUAL_DESC="AudioSpread (multi-output)"
+STATE_FILE="/tmp/audiospread.state"
+
+# ---------- helpers ----------
+
+get_sinks() {
+    pactl list short sinks | awk '{print $2}'
+}
+
+get_sink_descriptions() {
+    pactl list sinks | awk '
+        /Name:/ {name=$2}
+        /Description:/ {
+            desc=$0
+            sub("^[ \t]*Description: ", "", desc)
+            print name " | " desc
+        }
+    '
+}
+
+module_loaded() {
+    pactl list short modules | grep -q "$MODULE_NAME.*$VIRTUAL_SINK"
+}
+
+get_module_id() {
+    pactl list short modules | awk "/$MODULE_NAME.*$VIRTUAL_SINK/ {print \$1}"
+}
+
+# ---------- core ----------
+
+enable_spread() {
+    local sinks
+    sinks=$(get_sinks)
+
+    if [ "$(echo "$sinks" | wc -l)" -lt 2 ]; then
+        echo "❌ At least two sinks are required"
+        exit 1
+    fi
+
+    local sink_list
+    sink_list=$(echo "$sinks" | paste -sd, -)
+
+    pactl load-module \
+        "$MODULE_NAME" \
+        sink_name="$VIRTUAL_SINK" \
+        sink_properties="device.description=$VIRTUAL_DESC" \
+        slaves="$sink_list" >/dev/null
+
+    pactl set-default-sink "$VIRTUAL_SINK"
+    echo "spread" >"$STATE_FILE"
+
+    echo "✅ Audio spread enabled"
+}
+
+disable_spread() {
+    if module_loaded; then
+        pactl unload-module "$(get_module_id)"
+    fi
+
+    local fallback
+    fallback=$(get_sinks | head -n1)
+    pactl set-default-sink "$fallback"
+
+    rm -f "$STATE_FILE"
+    echo "⛔ Audio spread disabled"
+}
+
+status() {
+    echo "AudioSpread Status"
+    echo "------------------"
+
+    if module_loaded; then
+        echo "Mode: spread"
+        echo "Virtual sink: $VIRTUAL_SINK"
+    else
+        echo "Mode: single"
+    fi
+
+    echo
+    echo "Available sinks:"
+    get_sink_descriptions | nl -w2 -s'. '
+}
+
+toggle() {
+    if module_loaded; then
+        disable_spread
+    else
+        enable_spread
+    fi
+}
+
+# ---------- cli ----------
+
+case "${1:-toggle}" in
+    toggle) toggle ;;
+    on) enable_spread ;;
+    off) disable_spread ;;
+    status) status ;;
+    *)
+        echo "Usage: audiospread [toggle|on|off|status]"
+        exit 1
+        ;;
+esac

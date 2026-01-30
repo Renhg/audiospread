@@ -1,0 +1,43 @@
+# audiospread
+
+Minimal CLI tool to spread audio output across multiple sinks
+using PipeWire / PulseAudio.
+
+## Features
+
+- Multi-output audio (no sink limit)
+- Toggle on/off
+- Dynamic sink detection
+- PipeWire compatible
+- Window-manager friendly
+- No volume handling (by design)
+
+## Requirements
+
+- PipeWire or PulseAudio
+- pactl
+
+## Installation
+
+```bash
+git clone https://github.com/youruser/audiospread.git
+cd audiospread
+chmod +x audiospread
+ln -s $(pwd)/audiospread ~/.local/bin/audiospread
+
+## Usage
+
+```bash
+audiospread toggle
+audiospread on
+audiospread off
+audiospread status
+
+##Roadmap
+v1.1: volume sync & mute
+v2.0: profiles & persistence
+
+##  `LICENSE`
+MIT (estándar).
+
+
